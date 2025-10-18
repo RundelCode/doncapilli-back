@@ -1,34 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ParticipantsService } from './participants.service';
-import { CreateParticipantDto } from './dto/create-participant.dto';
-import { UpdateParticipantDto } from './dto/update-participant.dto';
 
 @Controller('participants')
 export class ParticipantsController {
-  constructor(private readonly participantsService: ParticipantsService) {}
+  constructor(private readonly service: ParticipantsService) {}
 
-  @Post()
-  create(@Body() createParticipantDto: CreateParticipantDto) {
-    return this.participantsService.create(createParticipantDto);
+  @Post('submit')
+  submit(@Body() body: { username: string; answer: string }) {
+    return this.service.submitAnswer({ username: body.username, rawAnswer: body.answer });
   }
 
-  @Get()
-  findAll() {
-    return this.participantsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.participantsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateParticipantDto: UpdateParticipantDto) {
-    return this.participantsService.update(+id, updateParticipantDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.participantsService.remove(+id);
+  @Get('leaderboard')
+  leaderboard(@Query('limit') limit?: string) {
+    return this.service.leaderboard(Number(limit) || 50);
   }
 }

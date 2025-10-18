@@ -18,10 +18,13 @@ export class Question {
   @Column({ type: 'text', default: 'inactive' })
   status: 'active' | 'inactive';
 
-  @ManyToOne(() => Quiz, (quiz) => quiz.questions, { onDelete: 'CASCADE', eager: false })
+  @ManyToOne(() => Quiz, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'quiz_id' })
   quiz: Quiz;
 
   @RelationId((q: Question) => q.quiz)
   quizId: string;
+
+  @Column({ name: 'correct_count', type: 'int', default: 0 })
+  correctCount: number;
 }

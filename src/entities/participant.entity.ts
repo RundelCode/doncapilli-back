@@ -1,17 +1,24 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Quiz } from './quiz.entity';
 
-@Entity({ name: 'participants' })
+@Entity('participants')
 export class Participant {
-  @PrimaryGeneratedColumn('uuid') id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Index()
-  @Column() username: string;
+  @Column()
+  username: string;
 
-  @Column({ type: 'int', default: 0 }) score: number;
+  @Column({ type: 'int', default: 0 })
+  score: number;
 
-  @ManyToOne(() => Quiz, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Quiz, { onDelete: 'CASCADE', eager: false })
   @JoinColumn({ name: 'quiz_id' })
-  @Index()
   quiz: Quiz;
+
+  @Column({ name: 'last_scored_question_id', type: 'uuid', nullable: true })
+  lastScoredQuestionId: string | null;
+
+  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  createdAt: Date;
 }

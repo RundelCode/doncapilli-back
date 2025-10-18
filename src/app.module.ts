@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminsModule } from './admins/admins.module';
 import { QuizzesModule } from './quizzes/quizzes.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ParticipantsModule } from './participants/participants.module';
+import { StreamerbotModule } from './streamerbot/streamerbot.module';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { ParticipantsModule } from './participants/participants.module';
     QuizzesModule,
     QuestionsModule,
     ParticipantsModule,
+    StreamerbotModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}
