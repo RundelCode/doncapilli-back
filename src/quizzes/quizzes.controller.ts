@@ -13,7 +13,8 @@ export class QuizzesController {
   create(@Body() dto: CreateQuizDto) {
     return this.service.create(dto);
   }
-
+  
+  @UseGuards(SupabaseAuthGuard)
   @Get()
   findAll() {
     return this.service.findAll();
