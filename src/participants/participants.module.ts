@@ -1,9 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ParticipantsService } from './participants.service';
-import { ParticipantsController } from './participants.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Participant } from '../entities/participant.entity';
+import { Quiz } from '../entities/quiz.entity';
+// import { ParticipantsService } from './participants.service';
+// import { ParticipantsController } from './participants.controller';
 
 @Module({
-  controllers: [ParticipantsController],
-  providers: [ParticipantsService],
+  imports: [TypeOrmModule.forFeature([Participant, Quiz])],
+  controllers: [], // [ParticipantsController]
+  providers: [],   // [ParticipantsService]
+  exports: [TypeOrmModule],
 })
-export class ParticipantsModule {}
+export class ParticipantsModule { }

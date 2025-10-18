@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-
+import { SupabaseModule } from './supabase/supabase.module';
+import { AuthModule } from './auth/auth.module';
 import { AdminsModule } from './admins/admins.module';
 import { QuizzesModule } from './quizzes/quizzes.module';
 import { QuestionsModule } from './questions/questions.module';
@@ -18,17 +16,17 @@ import { ParticipantsModule } from './participants/participants.module';
       useFactory: (cfg: ConfigService) => ({
         type: 'postgres',
         url: cfg.get<string>('DATABASE_URL'),
-        synchronize: false,
         autoLoadEntities: true,
+        synchronize: false,
         ssl: { rejectUnauthorized: false },
       }),
     }),
+    SupabaseModule,
+    AuthModule,
     AdminsModule,
     QuizzesModule,
     QuestionsModule,
     ParticipantsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

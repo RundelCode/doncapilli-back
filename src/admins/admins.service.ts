@@ -1,26 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { CreateAdminDto } from './dto/create-admin.dto';
-import { UpdateAdminDto } from './dto/update-admin.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Admin } from '../entities/admin.entity';
 
 @Injectable()
 export class AdminsService {
-  create(createAdminDto: CreateAdminDto) {
-    return 'This action adds a new admin';
+  constructor(@InjectRepository(Admin) private readonly repo: Repository<Admin>) { }
+
+  findByEmail(email: string) {
+    return this.repo.findOne({ where: { email } });
   }
 
-  findAll() {
-    return `This action returns all admins`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} admin`;
-  }
-
-  update(id: number, updateAdminDto: UpdateAdminDto) {
-    return `This action updates a #${id} admin`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} admin`;
+  async upsertProfile(email: string, username?: string) {
+    let admin = await this.findByEmail(email);
+    if (!admin) {
+      admin = this.repo.create({ email, username: username ?? email.split('@')[0] });
+    } else if (!admin.username && username) {
+      admin.username = username;
+    }
+    return this.repo.save(admin);
   }
 }
