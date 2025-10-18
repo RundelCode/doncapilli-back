@@ -1,18 +1,27 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, RelationId } from 'typeorm';
 import { Quiz } from './quiz.entity';
 
-@Entity({ name: 'questions' })
+@Entity('questions')
 export class Question {
-  @PrimaryGeneratedColumn('uuid') id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ type: 'text' }) question: string;
+  @Column()
+  question: string;
 
-  @Column('text', { array: true }) answers: string[];       // text[]
+  @Column('text', { array: true })
+  answers: string[];
 
-  @Column({ name: 'correct_answer', type: 'text' }) correctAnswer: string;
+  @Column({ name: 'correct_answer' })
+  correctAnswer: string;
 
-  @ManyToOne(() => Quiz, (q) => q.questions, { onDelete: 'CASCADE' })
+  @Column({ type: 'text', default: 'inactive' })
+  status: 'active' | 'inactive';
+
+  @ManyToOne(() => Quiz, (quiz) => quiz.questions, { onDelete: 'CASCADE', eager: false })
   @JoinColumn({ name: 'quiz_id' })
-  @Index()
   quiz: Quiz;
+
+  @RelationId((q: Question) => q.quiz)
+  quizId: string;
 }

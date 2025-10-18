@@ -24,6 +24,12 @@ export class QuestionsController {
     return this.service.findByQuiz(quizId);
   }
 
+  @Get('questions/quiz/:quizId/active')
+  async getActiveByQuiz(@Param('quizId') quizId: string) {
+    const list = await this.service.findByQuiz(quizId);
+    return list.find(q => q.status === 'active') ?? null;
+  }
+
   @UseGuards(SupabaseAuthGuard)
   @Patch('questions/:id')
   update(@Param('id') id: string, @Body() dto: UpdateQuestionDto) {
@@ -34,5 +40,15 @@ export class QuestionsController {
   @Delete('questions/:id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  @UseGuards(SupabaseAuthGuard)
+  @Patch('quizzes/:quizId/questions/:questionId/status')
+  setStatus(
+    @Param('quizId') quizId: string,
+    @Param('questionId') questionId: string,
+    @Body() body: { status: 'active' | 'inactive' },
+  ) {
+    return this.service.setStatus({ quizId, questionId, status: body.status });
   }
 }
