@@ -1,34 +1,43 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { QuestionsService } from './questions.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 
-@Controller('questions')
+@Controller()
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService) {}
+  constructor(private readonly service: QuestionsService) {}
 
-  @Post()
-  create(@Body() createQuestionDto: CreateQuestionDto) {
-    return this.questionsService.create(createQuestionDto);
+  // Crear pregunta (solo autenticado)
+  @UseGuards(SupabaseAuthGuard)
+  @Post('questions')
+  create(@Body() dto: CreateQuestionDto) {
+    return this.service.create(dto);
   }
 
-  @Get()
-  findAll() {
-    return this.questionsService.findAll();
-  }
-
-  @Get(':id')
+  // Obtener una pregunta
+  @Get('questions/:id')
   findOne(@Param('id') id: string) {
-    return this.questionsService.findOne(+id);
+    return this.service.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateQuestionDto: UpdateQuestionDto) {
-    return this.questionsService.update(+id, updateQuestionDto);
+  // Listar por quiz
+  @Get('questions/quiz/:quizId')
+  findByQuiz(@Param('quizId') quizId: string) {
+    return this.service.findByQuiz(quizId);
   }
 
-  @Delete(':id')
+  // Actualizar (solo autenticado)
+  @UseGuards(SupabaseAuthGuard)
+  @Patch('questions/:id')
+  update(@Param('id') id: string, @Body() dto: UpdateQuestionDto) {
+    return this.service.update(id, dto);
+  }
+
+  // Eliminar (solo autenticado)
+  @UseGuards(SupabaseAuthGuard)
+  @Delete('questions/:id')
   remove(@Param('id') id: string) {
-    return this.questionsService.remove(+id);
+    return this.service.remove(id);
   }
 }

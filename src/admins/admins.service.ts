@@ -11,13 +11,30 @@ export class AdminsService {
     return this.repo.findOne({ where: { email } });
   }
 
-  async upsertProfile(email: string, username?: string) {
-    let admin = await this.findByEmail(email);
+  async upsertFromSupabase(user: any) {
+    const email = user?.email as string | undefined;
+    const sub = user?.sub as string | undefined;
+    if (!email) return null;
+
+    const username =
+      user?.user_metadata?.user_name ||
+      user?.user_metadata?.username ||
+      user?.user_metadata?.name ||
+      email.split('@')[0];
+
+    let admin = sub ? await this.repo.findOne({ where: { authUserId: sub } }) : null;
+
     if (!admin) {
-      admin = this.repo.create({ email, username: username ?? email.split('@')[0] });
-    } else if (!admin.username && username) {
-      admin.username = username;
+      admin = await this.repo.findOne({ where: { email } });
     }
+
+    if (!admin) {
+      admin = this.repo.create({ email, username, authUserId: sub });
+    } else {
+       if (!admin.authUserId && sub) admin.authUserId = sub;
+      if (!admin.username) admin.username = username;
+    }
+
     return this.repo.save(admin);
   }
 }
