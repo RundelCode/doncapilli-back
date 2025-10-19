@@ -1,11 +1,14 @@
-import { Module, Global } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { StreamerbotService } from './streamerbot.service';
 import { StreamerbotController } from './streamerbot.controller';
+import { ParticipantsModule } from '../participants/participants.module';
 
-@Global()
 @Module({
-  controllers: [StreamerbotController],
+  imports: [
+    ParticipantsModule,
+  ],
   providers: [StreamerbotService],
+  controllers: [StreamerbotController],
   exports: [StreamerbotService],
 })
 export class StreamerbotModule {}

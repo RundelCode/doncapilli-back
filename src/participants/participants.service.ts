@@ -1,4 +1,3 @@
-// src/participants/participants.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -18,58 +17,48 @@ export class ParticipantsService {
   ) { }
 
   private BASE_POINTS = 10;
-  private BONUS_FIRST_10 = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]; // posición 1..10
+  private BONUS_FIRST_10 = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
   async submitAnswer({ username, rawAnswer }: SubmitPayload) {
-    // 1) Quiz activo
     const quiz = await this.quizRepo.findOne({ where: { status: 'active' } });
     if (!quiz) return { accepted: false, reason: 'NO_ACTIVE_QUIZ' };
 
-    // 2) Pregunta activa
     const question = await this.qRepo.findOne({
       where: { quiz: { id: quiz.id }, status: 'active' as any },
     });
     if (!question) return { accepted: false, reason: 'NO_ACTIVE_QUESTION' };
 
-    // 3) Normaliza y valida
     const answer = this.normalizeAnswer(rawAnswer);
     const correct = this.isCorrectAnswer(question, answer);
 
-    // 4) Busca/crea participante
     let participant = await this.pRepo.findOne({ where: { quiz: { id: quiz.id }, username } });
     if (!participant) {
       participant = this.pRepo.create({ username, quiz, score: 0, lastScoredQuestionId: null });
       participant = await this.pRepo.save(participant);
     }
 
-    // 5) Si incorrecta, no persistimos nada (como pediste)
     if (!correct) {
       return { accepted: true, correct: false, awardedPoints: 0, totalScore: participant.score };
     }
 
-    // 6) Transacción sin tabla de respuestas:
     return this.db.transaction(async (em) => {
       const pRepo = em.getRepository(Participant);
       const qRepo = em.getRepository(Question);
 
-      // Lock por pregunta (serializa el conteo de correctos y los bonos)
       await em.query(
         `SELECT pg_advisory_xact_lock( ('x'||substr(md5($1),1,16))::bit(64)::bigint )`,
         [question.id],
       );
 
-      // Evita doble puntaje en esta pregunta:
-      // Solo actualiza si last_scored_question_id ES DISTINTO de la pregunta activa
       const updRes = await pRepo
         .createQueryBuilder()
         .update(Participant)
-        .set({ lastScoredQuestionId: question.id }) // marcamos que ya puntuó esta
+        .set({ lastScoredQuestionId: question.id })
         .where('id = :pid', { pid: participant.id })
         .andWhere('(last_scored_question_id IS DISTINCT FROM :qid)', { qid: question.id })
         .returning(['id'])
         .execute();
 
-      // Si no actualizó, ya había puntuado esta pregunta (no sumar de nuevo)
       if (updRes.affected === 0) {
         const fresh = await pRepo.findOne({ where: { id: participant.id } });
         return {
@@ -81,7 +70,6 @@ export class ParticipantsService {
         };
       }
 
-      // Tomamos la posición leyendo y bloqueando la fila de la pregunta
       const qRow = await qRepo
         .createQueryBuilder('q')
         .setLock('pessimistic_write')
@@ -93,7 +81,6 @@ export class ParticipantsService {
       const bonus = position <= this.BONUS_FIRST_10.length ? this.BONUS_FIRST_10[position - 1] : 0;
       const awardedPoints = this.BASE_POINTS + bonus;
 
-      // Incrementa correct_count de la pregunta
       await qRepo
         .createQueryBuilder()
         .update(Question)
@@ -101,7 +88,6 @@ export class ParticipantsService {
         .where('id = :qid', { qid: question.id })
         .execute();
 
-      // Suma al score
       await pRepo
         .createQueryBuilder()
         .update(Participant)
@@ -131,7 +117,6 @@ export class ParticipantsService {
     });
   }
 
-  // Helpers
   private normalizeAnswer(s: string) {
     const t = (s ?? '').trim().toLowerCase();
     if (['a', 'b', 'c', 'd', 'e'].includes(t)) return t;
