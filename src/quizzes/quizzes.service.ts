@@ -48,14 +48,14 @@ export class QuizzesService {
   }
 
   async createForAuthUser(dto: CreateQuizDto, authUserId: string) {
-  const admin = await this.adminRepo.findOne({ where: { authUserId } });
-  if (!admin) throw new NotFoundException('Admin no encontrado para este token');
+    const admin = await this.adminRepo.findOne({ where: { authUserId } });
+    if (!admin) throw new NotFoundException('Admin no encontrado para este token');
 
-  const quiz = this.quizRepo.create({
-    title: dto.title,
-    status: (dto.status ?? 'inactive') as any,
-    admin,
-  });
-  return this.quizRepo.save(quiz);
-}
-}
+    const quiz = this.quizRepo.create({
+      title: dto.title,
+      status: (dto.status ?? 'inactive') as any,
+      admin,
+    });
+    return this.quizRepo.save(quiz);
+  }
+} 

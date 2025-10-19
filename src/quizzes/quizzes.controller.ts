@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { QuizzesService } from './quizzes.service';
 import { CreateQuizDto } from './dto/create-quiz.dto';
 import { UpdateQuizDto } from './dto/update-quiz.dto';
@@ -13,7 +13,7 @@ export class QuizzesController {
   create(@Body() dto: CreateQuizDto) {
     return this.service.create(dto);
   }
-  
+
   @UseGuards(SupabaseAuthGuard)
   @Get()
   findAll() {
@@ -36,4 +36,14 @@ export class QuizzesController {
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
+
+  @UseGuards(SupabaseAuthGuard)
+  @Patch(':id/deactivate')
+  deactivate(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('El ID es requerido');
+    }
+    return this.service.update(id, { status: 'inactive' });
+  }
+
 }
