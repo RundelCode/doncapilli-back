@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Participant } from '../entities/participant.entity';
@@ -9,6 +9,8 @@ type SubmitPayload = { username: string; rawAnswer: string };
 
 @Injectable()
 export class ParticipantsService {
+  private readonly log = new Logger(ParticipantsService.name);
+
   constructor(
     @InjectRepository(Participant) private readonly pRepo: Repository<Participant>,
     @InjectRepository(Quiz) private readonly quizRepo: Repository<Quiz>,
@@ -114,6 +116,18 @@ export class ParticipantsService {
       where: { quiz: { id: quiz.id } },
       order: { score: 'DESC', username: 'ASC' },
       take: Math.max(1, Math.min(limit, 500)),
+    });
+  }
+
+  async allByQuiz(quizId: string) {
+    const quiz = await this.quizRepo.findOne({ where: { id: quizId } });
+    if (!quiz) {
+      return [];
+    }
+
+    return this.pRepo.find({
+      where: { quiz: { id: quizId } },
+      order: { username: 'ASC' },
     });
   }
 
