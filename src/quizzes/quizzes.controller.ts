@@ -46,4 +46,9 @@ export class QuizzesController {
     return this.service.update(id, { status: 'inactive' });
   }
 
+  @Get('active')
+  findActive() {
+    return this.service.findActive();
+  }
+
 }

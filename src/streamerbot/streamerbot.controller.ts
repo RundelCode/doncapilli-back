@@ -1,10 +1,11 @@
-import { Controller, Get, Query, Sse, MessageEvent, Post, Body } from '@nestjs/common';
+import { Controller, Get, Query, Sse, MessageEvent, Post, Body, UseGuards } from '@nestjs/common';
 import { map, Observable } from 'rxjs';
 import { StreamerbotService } from './streamerbot.service';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 
 @Controller('streamerbot')
 export class StreamerbotController {
-  constructor(private readonly sb: StreamerbotService) {}
+  constructor(private readonly sb: StreamerbotService) { }
 
   @Get('health')
   health() { return this.sb.getHealth(); }
@@ -26,6 +27,7 @@ export class StreamerbotController {
     return this.sb.events$.pipe(map((data) => ({ data } as MessageEvent)));
   }
 
+  @UseGuards(SupabaseAuthGuard)
   @Post('simulate')
   simulate(@Body() body: any) {
     const msg = this.sb.simulateIncoming(body?.text ?? '!ping', body?.user ?? 'Tester');

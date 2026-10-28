@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { Subject } from 'rxjs';
 import WebSocket from 'ws';
 import { ParticipantsService } from '../participants/participants.service';
+import { PollsService, VoteResult } from '../polls/polls.service';
 
 type ChatMsg = {
   platform: 'twitch';
@@ -20,58 +21,64 @@ type ChatMsg = {
   raw?: any;
 };
 
+type VoteEvent = {
+  kind: 'vote';
+  username: string;
+  position: number;
+  result: VoteResult | { accepted: false; reason: string };
+};
+
 type SubmissionEvent = {
   kind: 'submission';
   username: string;
   rawAnswer: string;
   result:
-    | {
-        accepted: true;
-        correct: boolean;
-        awardedPoints: number;
-        position?: number;
-        totalScore: number;
-        reason?: string;
-      }
-    | {
-        accepted: false;
-        reason: string;
-        correct?: boolean;
-        awardedPoints?: number;
-        totalScore?: number;
-      };
+  | {
+    accepted: true;
+    correct: boolean;
+    awardedPoints: number;
+    position?: number;
+    totalScore: number;
+    reason?: string;
+  }
+  | {
+    accepted: false;
+    reason: string;
+    correct?: boolean;
+    awardedPoints?: number;
+    totalScore?: number;
+  };
 };
 
 @Injectable()
 export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StreamerbotService.name);
 
-  constructor(private readonly participants: ParticipantsService) {}
+  constructor(
+    private readonly participants: ParticipantsService,
+    private readonly polls: PollsService,
+  ) { }
 
-  // WS crudo
   private ws: WebSocket | null = null;
   private heartbeat: NodeJS.Timeout | null = null;
 
-  // Reconexión
+
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private readonly reconnectBaseMs = 1000;
   private manualClose = false;
 
-  // Estado/Salud
   private connected = false;
   private lastEventAt: Date | null = null;
   private lastConnectInfo: { name?: string; version?: string } | null = null;
 
-  // Memoria + SSE
-  private eventsSubject = new Subject<any>(); // ChatMsg | SubmissionEvent
+  private eventsSubject = new Subject<any>(); // ChatMsg | SubmissionEvent | VoteEvent
   public readonly events$ = this.eventsSubject.asObservable();
   private lastChat: ChatMsg | null = null;
   private recent: ChatMsg[] = [];
   private readonly recentMax = 100;
-  private counters = { chatMessages: 0, commands: 0, submissions: 0 };
+  private counters = { chatMessages: 0, commands: 0, submissions: 0, votes: 0 };
 
-  // Config
   private readonly host = process.env.STREAMERBOT_HOST ?? '127.0.0.1';
   private readonly port = Number(process.env.STREAMERBOT_PORT ?? 8080);
   private readonly endpointRaw = process.env.STREAMERBOT_ENDPOINT ?? '/';
@@ -87,13 +94,12 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
     this.manualClose = true;
     this.stopHeartbeat();
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try { this.ws.close(1000, 'app shutting down'); } catch {}
+      try { this.ws.close(1000, 'app shutting down'); } catch { }
     }
     this.ws = null;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
   }
 
-  // ---------- WS core ----------
   private open() {
     const url = `ws://${this.host}:${this.port}${this.endpoint}`;
     try {
@@ -110,6 +116,7 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
       this.ws.on('message', (buf: WebSocket.RawData) => {
         let msg: any;
         try { msg = JSON.parse(buf.toString()); } catch { return; }
+        this.logger.log(`WS ← ${buf.toString().slice(0, 400)}`);
 
         if (msg?.request === 'Hello' || msg?.info?.name === 'Streamer.bot') {
           this.lastConnectInfo = {
@@ -163,14 +170,13 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
       try {
         this.ws.send(JSON.stringify({ request: 'GetInfo', id: 'ping' }));
-      } catch {}
+      } catch { }
     }, 15000);
   }
   private stopHeartbeat() {
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
   }
-  // -----------------------------
 
   private subscribeToChatMessage() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -233,18 +239,19 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
       raw: data,
     };
 
-    // Guarda para endpoints/SSE
     this.lastChat = chat;
     this.recent.push(chat);
     if (this.recent.length > this.recentMax) this.recent.shift();
     this.eventsSubject.next(chat);
 
-    // ---- Router de comandos ----
+    this.handleCommand(chat);
+  }
+
+  private handleCommand(chat: ChatMsg) {
     const t = chat.message.text.trim();
     if (!t.startsWith('!')) return;
     this.counters.commands++;
 
-    // !R <respuesta>  (acepta comillas o sin comillas)
     const m = t.match(/^!r\s+(.+)$/i);
     if (m) {
       const rawAnswer = this.cleanQuoted(m[1]);
@@ -259,10 +266,16 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
         } as SubmissionEvent),
       );
     }
+
+    const v = t.match(/^!vote\s+(\d{1,2})$/i);
+    if (v) {
+      this.submitVote(chat, Number(v[1])).catch((e) =>
+        this.logger.error(`Error registrando voto: ${e?.message ?? e}`),
+      );
+    }
   }
 
   private cleanQuoted(s: string) {
-    // quita comillas " ' o tipográficas al inicio/fin
     return (s ?? '').trim().replace(/^["'“”]+|["'“”]+$/g, '').trim();
   }
 
@@ -273,7 +286,22 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
     this.eventsSubject.next(evt);
   }
 
-  // ========= API pública =========
+  private async submitVote(chat: ChatMsg, position: number) {
+    this.counters.votes++;
+
+    const username = chat.user.name || chat.user.displayName || 'anon';
+    const voterKey = chat.user.id ? `twitch:${chat.user.id}` : `login:${username.toLowerCase()}`;
+
+    let result: VoteEvent['result'];
+    try {
+      result = await this.polls.castVote({ voterKey, username, position });
+    } catch (e: any) {
+      result = { accepted: false, reason: `ERROR:${e?.message ?? 'unknown'}` };
+    }
+    const evt: VoteEvent = { kind: 'vote', username, position, result };
+    this.eventsSubject.next(evt);
+  }
+
   public getHealth() {
     return {
       connected: this.connected,
@@ -302,7 +330,7 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  // Simulador (si usas POST /streamerbot/_simulate)
+
   public simulateIncoming(text: string, displayName = 'Tester') {
     const chat: ChatMsg = {
       platform: 'twitch',
@@ -313,11 +341,11 @@ export class StreamerbotService implements OnModuleInit, OnModuleDestroy {
     };
     this.lastEventAt = new Date();
     this.counters.chatMessages++;
-    if (text?.trim().startsWith('!')) this.counters.commands++;
     this.lastChat = chat;
     this.recent.push(chat);
     if (this.recent.length > this.recentMax) this.recent.shift();
     this.eventsSubject.next(chat);
+    this.handleCommand(chat); 
     return chat;
   }
 }

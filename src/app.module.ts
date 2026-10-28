@@ -9,6 +9,7 @@ import { QuizzesModule } from './quizzes/quizzes.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ParticipantsModule } from './participants/participants.module';
 import { StreamerbotModule } from './streamerbot/streamerbot.module';
+import { PollsModule } from './polls/polls.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { StreamerbotModule } from './streamerbot/streamerbot.module';
     QuestionsModule,
     ParticipantsModule,
     StreamerbotModule,
+    PollsModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -47,6 +47,14 @@ export class QuizzesService {
     return { ok: true };
   }
 
+  async findActive() {
+    const quiz = await this.quizRepo.findOne({
+      where: { status: 'active' },
+      relations: ['admin'],
+    });
+    return { trivia: quiz ?? null };
+  }
+
   async createForAuthUser(dto: CreateQuizDto, authUserId: string) {
     const admin = await this.adminRepo.findOne({ where: { authUserId } });
     if (!admin) throw new NotFoundException('Admin no encontrado para este token');

@@ -15,7 +15,6 @@ export class QuestionsService {
     @InjectRepository(Quiz) private readonly quizRepo: Repository<Quiz>,
   ) { }
 
-  // Crear pregunta
   async create(dto: CreateQuestionDto) {
     const quiz = await this.quizRepo.findOne({ where: { id: dto.quizId } });
     if (!quiz) throw new NotFoundException('Quiz no encontrado');
@@ -30,29 +29,25 @@ export class QuestionsService {
     return this.qRepo.save(question);
   }
 
-  // Una pregunta por id
   async findOne(id: string) {
     const q = await this.qRepo.findOne({ where: { id }, relations: ['quiz'] });
     if (!q) throw new NotFoundException('Pregunta no encontrada');
     return q;
   }
 
-  // Listar preguntas por quiz (activa primero)
   findByQuiz(quizId: string) {
     return this.qRepo.find({
       where: { quiz: { id: quizId } },
-      order: { status: 'DESC', id: 'ASC' }, // active > inactive
+      order: { status: 'DESC', id: 'ASC' },
     });
   }
 
-  // Obtener la pregunta activa de un quiz (o null)
   async findActiveByQuiz(quizId: string) {
     return this.qRepo.findOne({
       where: { quiz: { id: quizId }, status: 'active' as Status },
     });
   }
 
-  // Actualizar una pregunta
   async update(id: string, dto: UpdateQuestionDto) {
     const q = await this.findOne(id);
     Object.assign(q, dto);
@@ -60,21 +55,18 @@ export class QuestionsService {
     return this.findOne(id);
   }
 
-  // Eliminar una pregunta
   async remove(id: string) {
     const q = await this.findOne(id);
     await this.qRepo.remove(q);
     return { ok: true };
   }
 
-  // ✅ Cambiar estado garantizando solo 1 activa por quiz (con transacción)
   async setStatus(input: { quizId: string; questionId: string; status: Status }) {
     const { quizId, questionId, status } = input;
 
     return this.qRepo.manager.transaction(async (em) => {
       const qRepo = em.getRepository(Question);
 
-      // Verifica pertenencia
       const question = await qRepo.findOne({
         where: { id: questionId, quiz: { id: quizId } },
         relations: ['quiz'],
@@ -82,7 +74,6 @@ export class QuestionsService {
       if (!question) throw new NotFoundException('Question not found in this quiz');
 
       if (status === 'active') {
-        // Desactivar todas las demás activas del mismo quiz
         await qRepo
           .createQueryBuilder()
           .update(Question)
@@ -92,7 +83,6 @@ export class QuestionsService {
           .andWhere('status = :active', { active: 'active' })
           .execute();
 
-        // Activar la seleccionada
         await qRepo
           .createQueryBuilder()
           .update(Question)
@@ -100,7 +90,6 @@ export class QuestionsService {
           .where('id = :questionId', { questionId })
           .execute();
       } else {
-        // Solo desactivar esta
         await qRepo
           .createQueryBuilder()
           .update(Question)
@@ -109,7 +98,6 @@ export class QuestionsService {
           .execute();
       }
 
-      // Devuelve el estado final desde BD
       return qRepo.findOne({
         where: { id: questionId },
         relations: ['quiz'],
